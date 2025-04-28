@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Power Consumption Management</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-5">
+    <h1>Power Consumption Management</h1>
+
+    <!-- Add Appliance -->
+    <h2>Add Appliance</h2>
+    <form method="POST" action="/add_appliance">
+        <label for="name">Appliance Name:</label>
+        <input type="text" name="name" required>
+        <label for="power_consumption">Power Consumption (Watts):</label>
+        <input type="number" step="0.01" name="power_consumption" required>
+        <button type="submit" class="btn btn-primary">Add Appliance</button>
+    </form>
+
+<!-- Edit Appliance -->
+<h2>Edit Appliance</h2>
+{% for appliance in appliances %}
+    <div class="appliance" id="appliance-{{ appliance[0] }}">
+        <p>{{ appliance[1] }}: {{ appliance[2] }} Watts</p>
+    <button type="button" class="btn btn-warning edit-button" onclick="toggleEdit({{ appliance[0] }})">Edit</button>
+    <form method="POST" action="/edit_appliance/{{ appliance[0] }}" class="edit-form d-none">
+        <label for="new_power">New Power Consumption (Watts):</label>
+        <input type="number" step="0.01" name="new_power" required>
+        <button type="submit" class="btn btn-success">Save</button>
+    </form>
+    <form method="POST" action="/delete_appliance/{{ appliance[0] }}">
+        <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+    </div>
+{% endfor %}
+
+
+<script>
+    function toggleEdit(applianceId) {
+        // Hide the edit button and show the edit form
+        const applianceDiv = document.getElementById(`appliance-${applianceId}`);
+        const editButton = applianceDiv.querySelector('.edit-button');
+        const editForms = applianceDiv.querySelectorAll('.edit-form');
+        
+        // Toggle visibility
+        editButton.classList.toggle('d-none');
+        editForms.forEach(form => form.classList.toggle('d-none'));
+    }
+</script>
+
+<style>
+    .d-none {
+        display: none;
+    }
+</style>
+
+    <!-- Predict Consumption -->
+    <h2>Predict Energy Consumption</h2>
+    <form id="predictionForm">
+        {% for appliance in appliances %}
+            <h4>{{ appliance[1] }}</h4>
+            <label for="{{ appliance[1] }}_count">Number of Units:</label>
+            <input type="number" name="{{ appliance[1] }}_count" min="0" required>
+            <label for="{{ appliance[1] }}_hours">Hours of Usage:</label>
+            <input type="number" step="0.01" name="{{ appliance[1] }}_hours" min="0" required>
+        {% endfor %}
+        <button type="submit" class="btn btn-success">Predict Consumption</button>
+    </form>
+    <p>Predicted Consumption: <span id="predictionResult"></span> kWh</p>
+
+    <!-- Set Limit -->
+    <h2>Set Power Limit</h2>
+    <form id="limitForm">
+        <label for="limit">Maximum Limit (Watts):</label>
+        <input type="number" step="0.01" name="limit" required>
+        <input type="hidden" id="predictedConsumption" name="consumption">
+        <button type="submit" class="btn btn-danger">Set Limit</button>
+    </form>
+    <p id="limitResult"></p>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $('#predictionForm').on('submit', function (e) {
+            e.preventDefault();
+            $.ajax({
+                type: 'POST',
+                url: '/predict',
+                data: $('#predictionForm').serialize(),
+                success: function (data) {
+                    $('#predictionResult').text(data.prediction + ' kWh');
+                    $('#predictedConsumption').val(data.prediction);
+                },
+                error: function (error) {
+                    console.error("Prediction request error:", error);
+                }
+            });
+        });
+
+        $('#limitForm').on('submit', function (e) {
+            e.preventDefault();
+            $.ajax({
+                type: 'POST',
+                url: '/set_limit',
+                data: $('#limitForm').serialize(),
+                success: function (data) {
+                    if (data.status === "limit_exceeded") {
+                        $('#limitResult').html(`Limit exceeded by ${data.exceeded_by} Watts.<br>Tips: ${data.tips.join(', ')}`);
+                    } else {
+                        $('#limitResult').text("Consumption is within the limit.");
+                    }
+                },
+                error: function (error) {
+                    console.error("Limit check error:", error);
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>
